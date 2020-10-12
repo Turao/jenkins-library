@@ -56,11 +56,11 @@ func TestRunKubernetesDeploy(t *testing.T) {
 			"deploymentName",
 			"path/to/chart",
 			"--install",
-			"--force",
 			"--namespace",
 			"deploymentNamespace",
 			"--set",
 			"image.repository=my.registry:55555/path/to/Image,image.tag=latest,secret.name=testSecret,secret.dockerconfigjson=ThisIsOurBase64EncodedSecret==,imagePullSecrets[0].name=testSecret,ingress.hosts[0]=ingress.host1,ingress.hosts[1]=ingress.host2",
+			"--force",
 			"--wait",
 			"--timeout",
 			"400",
@@ -113,7 +113,64 @@ func TestRunKubernetesDeploy(t *testing.T) {
 			"--values",
 			"values2.yaml",
 			"--install",
+			"--namespace",
+			"deploymentNamespace",
+			"--set",
+			"image.repository=my.registry:55555/path/to/Image,image.tag=latest,secret.name=testSecret,secret.dockerconfigjson=ThisIsOurBase64EncodedSecret==,imagePullSecrets[0].name=testSecret",
 			"--force",
+			"--atomic",
+			"--timeout",
+			"400s",
+			"--kube-context",
+			"testCluster",
+			"--testParam",
+			"testValue",
+		}, e.Calls[1].Params, "Wrong upgrade parameters")
+	})
+
+	t.Run("test helm v3 - force deploy disabled", func(t *testing.T) {
+		opts := kubernetesDeployOptions{
+			ContainerRegistryURL:      "https://my.registry:55555",
+			ContainerRegistryUser:     "registryUser",
+			ContainerRegistryPassword: "********",
+			ContainerRegistrySecret:   "testSecret",
+			ChartPath:                 "path/to/chart",
+			DeploymentName:            "deploymentName",
+			DeployTool:                "helm3",
+			ForceHelmDeploy:           false,
+			HelmDeployWaitSeconds:     400,
+			HelmValues:                []string{"values1.yaml", "values2.yaml"},
+			Image:                     "path/to/Image:latest",
+			AdditionalParameters:      []string{"--testParam", "testValue"},
+			KubeContext:               "testCluster",
+			Namespace:                 "deploymentNamespace",
+		}
+
+		dockerConfigJSON := `{"kind": "Secret","data":{".dockerconfigjson": "ThisIsOurBase64EncodedSecret=="}}`
+
+		e := mock.ExecMockRunner{
+			StdoutReturn: map[string]string{
+				`kubectl --insecure-skip-tls-verify=true create secret docker-registry testSecret --docker-server=my.registry:55555 --docker-username=registryUser --docker-password=\*\*\*\*\*\*\*\* --dry-run=true --output=json`: dockerConfigJSON,
+			},
+		}
+
+		var stdout bytes.Buffer
+
+		runKubernetesDeploy(opts, &e, &stdout)
+
+		assert.Equal(t, "kubectl", e.Calls[0].Exec, "Wrong secret creation command")
+		assert.Equal(t, []string{"--insecure-skip-tls-verify=true", "create", "secret", "docker-registry", "testSecret", "--docker-server=my.registry:55555", "--docker-username=registryUser", "--docker-password=********", "--dry-run=true", "--output=json"}, e.Calls[0].Params, "Wrong secret creation parameters")
+
+		assert.Equal(t, "helm", e.Calls[1].Exec, "Wrong upgrade command")
+		assert.Equal(t, []string{
+			"upgrade",
+			"deploymentName",
+			"path/to/chart",
+			"--values",
+			"values1.yaml",
+			"--values",
+			"values2.yaml",
+			"--install",
 			"--namespace",
 			"deploymentNamespace",
 			"--set",
@@ -155,11 +212,11 @@ func TestRunKubernetesDeploy(t *testing.T) {
 			"deploymentName",
 			"path/to/chart",
 			"--install",
-			"--force",
 			"--namespace",
 			"deploymentNamespace",
 			"--set",
 			"image.repository=my.registry:55555/path/to/Image,image.tag=latest,imagePullSecrets[0].name=testSecret",
+			"--force",
 			"--atomic",
 			"--timeout",
 			"400s",

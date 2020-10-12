@@ -171,6 +171,14 @@ spec:
           - kubectl
           - helm
           - helm3
+      - name: forceHelmDeploy
+        type: bool
+        description: Enables the --force parameter when deploying with helm.
+        scope:
+          - PARAMETERS
+          - STAGES
+          - STEPS
+        default: true
       - name: helmDeployWaitSeconds
         type: int
         description: Number of seconds before helm deploy returns.
